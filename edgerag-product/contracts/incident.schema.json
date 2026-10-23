@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EdgeRAG Incident Sync Payload",
+  "description": "Validation schema for mobile offline incident outbox synchronization over LAN/Hotspot.",
+  "type": "object",
+  "required": [
+    "device_id",
+    "sync_timestamp",
+    "incidents"
+  ],
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sync_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "incidents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "equipment_id",
+          "title",
+          "description",
+          "severity",
+          "recorded_offline_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "equipment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "minLength": 5
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+          },
+          "recorded_offline_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "linked_manual_page": {
+            "type": ["integer", "null"]
+          },
+          "citation_chunk_id": {
+            "type": ["string", "null"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

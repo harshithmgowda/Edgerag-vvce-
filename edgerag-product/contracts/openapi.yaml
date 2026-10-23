@@ -1,0 +1,1390 @@
+openapi: 3.0.3
+info:
+  title: EdgeRAG Headquarters & Edge Synchronization API
+  version: 1.0.0
+  description: >
+    Official REST contract for EdgeRAG: industrial equipment PDF manual ingestion,
+    vector knowledge package distribution, LAN/hotspot synchronization, offline incident
+    intake, and LangGraph agentic chat.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development backend
+  - url: http://192.168.137.1:8000/api/v1
+    description: Windows Mobile Hotspot default gateway
+
+paths:
+  # =========================================================================
+  # System Health & Readiness
+  # =========================================================================
+  /health:
+    get:
+      summary: Backend Health & Service Status
+      operationId: getHealthStatus
+      responses:
+        '200':
+          description: Service status with database, redis, and storage checks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  # =========================================================================
+  # Authentication
+  # =========================================================================
+  /auth/login:
+    post:
+      summary: Authenticate User and Obtain JWT
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid username or password
+
+  /auth/register-admin:
+    post:
+      summary: Bootstrap First Administrator Account
+      operationId: registerAdmin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: Administrator created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Administrator already bootstrapped
+
+  /auth/me:
+    get:
+      summary: Get Current Authenticated User Profile
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  # =========================================================================
+  # Equipment Management
+  # =========================================================================
+  /equipment:
+    get:
+      summary: List Registered Equipment
+      operationId: listEquipment
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of equipment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Equipment'
+    post:
+      summary: Create New Equipment Record
+      operationId: createEquipment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentCreate'
+      responses:
+        '201':
+          description: Equipment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+
+  /equipment/{equipment_id}:
+    delete:
+      summary: Delete equipment and associated stored resources (administrator only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: equipment_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Records deleted; cleanup_pending counts files requiring administrator cleanup
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, cleanup_pending]
+                properties:
+                  deleted: {type: boolean}
+                  cleanup_pending: {type: integer}
+        '401':
+          description: Bearer token required
+        '403':
+          description: Administrator role required
+        '404':
+          description: Record not found
+        '409':
+          description: Active processing job prevents deletion
+    get:
+      summary: Get Equipment Details by ID
+      operationId: getEquipmentById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: equipment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Equipment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '404':
+          description: Equipment not found
+    patch:
+      summary: Update Equipment Details
+      operationId: updateEquipment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: equipment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentUpdate'
+      responses:
+        '200':
+          description: Updated equipment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+
+  # =========================================================================
+  # Manuals & PDF Upload
+  # =========================================================================
+  /manuals:
+    get:
+      summary: List Uploaded Manuals
+      operationId: listManuals
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: equipment_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of manuals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Manual'
+    post:
+      summary: Upload PDF Manual and Trigger Processing Job
+      operationId: uploadManual
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - equipment_id
+                - title
+                - revision
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The PDF file (max 50MB)
+                equipment_id:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                revision:
+                  type: string
+                  example: "v1.2.0"
+                description:
+                  type: string
+      responses:
+        '202':
+          description: Manual accepted and processing job queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualUploadResponse'
+
+  /manuals/{manual_id}:
+    delete:
+      summary: Delete manual and associated stored resources (administrator only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: manual_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Records deleted; cleanup_pending counts files requiring administrator cleanup
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, cleanup_pending]
+                properties:
+                  deleted: {type: boolean}
+                  cleanup_pending: {type: integer}
+        '401':
+          description: Bearer token required
+        '403':
+          description: Administrator role required
+        '404':
+          description: Record not found
+        '409':
+          description: Active processing job prevents deletion
+    get:
+      summary: Get Manual Details
+      operationId: getManual
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: manual_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Manual details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manual'
+
+  # =========================================================================
+  # Processing Jobs (Celery Worker)
+  # =========================================================================
+  /jobs/{job_id}:
+    get:
+      summary: Get Processing Job Status
+      operationId: getJobStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Current job status, stage, progress, and result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJob'
+
+  # =========================================================================
+  # Knowledge Packages
+  # =========================================================================
+  /packages:
+    get:
+      summary: List Published Knowledge Packages
+      operationId: listPackages
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: equipment_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of verified packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KnowledgePackage'
+
+  /packages/{package_id}/download:
+    get:
+      summary: Download Knowledge Package ZIP
+      operationId: downloadPackage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: package_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The verified knowledge package ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  # =========================================================================
+  # Devices & Pairing
+  # =========================================================================
+  /devices:
+    get:
+      summary: List Registered Field Devices
+      operationId: listDevices
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of registered devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+
+  /devices/register:
+    post:
+      summary: Register a Field Android Device
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+      responses:
+        '201':
+          description: Device registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegisterResponse'
+
+  /devices/heartbeat:
+    post:
+      summary: Record Device Heartbeat and Report Local State
+      operationId: deviceHeartbeat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceHeartbeatRequest'
+      responses:
+        '200':
+          description: Heartbeat recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceHeartbeatResponse'
+
+  /devices/{device_id}/revoke:
+    post:
+      summary: Revoke Device Access
+      operationId: revokeDevice
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Device revoked
+
+  # =========================================================================
+  # Hotspot LAN Synchronization
+  # =========================================================================
+  /sync/check:
+    post:
+      summary: Check for Missing or Updated Packages
+      operationId: checkSyncUpdates
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncCheckRequest'
+      responses:
+        '200':
+          description: Sync delta with required packages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncCheckResponse'
+
+  /sync/incidents:
+    post:
+      summary: Idempotently Synchronize Field Incidents Outbox
+      operationId: syncIncidents
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentSyncPayload'
+      responses:
+        '200':
+          description: Sync results with accepted, duplicated, and rejected counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentSyncResult'
+
+  # =========================================================================
+  # Incidents & Headquarters Review
+  # =========================================================================
+  /incidents:
+    get:
+      summary: List Field Incidents
+      operationId: listIncidents
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: equipment_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, IN_REVIEW, RESOLVED, DISMISSED]
+      responses:
+        '200':
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Incident'
+
+  /incidents/{incident_id}:
+    get:
+      summary: Get Incident Details by UUID
+      operationId: getIncident
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Incident details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+
+  /incidents/{incident_id}/review:
+    patch:
+      summary: Submit Administrator Review for Incident
+      operationId: reviewIncident
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentReviewUpdate'
+      responses:
+        '200':
+          description: Incident review saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+
+  # =========================================================================
+  # AI Provider Settings & Chat
+  # =========================================================================
+  /ai/providers:
+    get:
+      summary: List Configured AI Providers
+      operationId: listAiProviders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of providers with masked secrets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AiProvider'
+    post:
+      summary: Configure or Update an AI Provider
+      operationId: updateAiProvider
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiProviderConfig'
+      responses:
+        '200':
+          description: Provider saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiProvider'
+
+  /ai/providers/{provider_id}/test:
+    post:
+      summary: Test Provider Connectivity with Actual Request
+      operationId: testAiProvider
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiProviderTestResult'
+
+  /ai/chat:
+    post:
+      summary: Execute LangGraph Server-Side Agentic RAG Chat
+      operationId: executeAiChat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Grounded answer with source citations and observable trace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+
+  /ai/chat/stream:
+    post:
+      summary: Stream LangGraph Server-Side Agentic RAG Tokens
+      operationId: streamAiChat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Server-Sent Events (SSE) text stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+# ===========================================================================
+# Components & Data Models
+# ===========================================================================
+  /packages/{package_id}:
+    delete:
+      summary: Delete package and associated stored resources (administrator only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: package_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Records deleted; cleanup_pending counts files requiring administrator cleanup
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, cleanup_pending]
+                properties:
+                  deleted: {type: boolean}
+                  cleanup_pending: {type: integer}
+        '401':
+          description: Bearer token required
+        '403':
+          description: Administrator role required
+        '404':
+          description: Record not found
+        '409':
+          description: Active processing job prevents deletion
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - database
+        - redis
+        - storage
+        - version
+      properties:
+        status:
+          type: string
+          example: "HEALTHY"
+        database:
+          type: string
+          example: "CONNECTED"
+        redis:
+          type: string
+          example: "CONNECTED"
+        storage:
+          type: string
+          example: "ONLINE"
+        version:
+          type: string
+          example: "1.0.0"
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "admin"
+        password:
+          type: string
+          example: "IndustrialAdmin2026!"
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - user
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: "bearer"
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    UserCreate:
+      type: object
+      required:
+        - username
+        - email
+        - password
+        - role
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, FIELD_ENGINEER]
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - role
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Equipment:
+      type: object
+      required:
+        - id
+        - name
+        - model_number
+        - manufacturer
+        - serial_number
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Siemens S7-1500 PLC Rack"
+        model_number:
+          type: string
+          example: "6ES7516-3AN02-0AB0"
+        manufacturer:
+          type: string
+          example: "Siemens AG"
+        serial_number:
+          type: string
+          example: "SN-2026-9938A"
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    EquipmentCreate:
+      type: object
+      required:
+        - name
+        - model_number
+        - manufacturer
+        - serial_number
+      properties:
+        name:
+          type: string
+        model_number:
+          type: string
+        manufacturer:
+          type: string
+        serial_number:
+          type: string
+        description:
+          type: string
+
+    EquipmentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        model_number:
+          type: string
+        manufacturer:
+          type: string
+        serial_number:
+          type: string
+        description:
+          type: string
+
+    Manual:
+      type: object
+      required:
+        - id
+        - equipment_id
+        - title
+        - revision
+        - file_name
+        - file_size_bytes
+        - page_count
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipment_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        revision:
+          type: string
+        file_name:
+          type: string
+        file_size_bytes:
+          type: integer
+        page_count:
+          type: integer
+        status:
+          type: string
+          enum: [UPLOADED, PROCESSING, PROCESSED, FAILED]
+        created_at:
+          type: string
+          format: date-time
+
+    ManualUploadResponse:
+      type: object
+      required:
+        - manual_id
+        - job_id
+        - status
+      properties:
+        manual_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: "QUEUED"
+
+    ProcessingJob:
+      type: object
+      required:
+        - id
+        - manual_id
+        - equipment_id
+        - status
+        - stage
+        - progress_percentage
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        manual_id:
+          type: string
+          format: uuid
+        equipment_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, SUCCEEDED, FAILED]
+        stage:
+          type: string
+          enum: [INIT, EXTRACTING_PAGES, CHUNKING, EMBEDDING, GENERATING_SQLITE, PACKAGING, VERIFYING, COMPLETED]
+        progress_percentage:
+          type: integer
+          example: 85
+        total_pages:
+          type: integer
+        total_chunks:
+          type: integer
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    KnowledgePackage:
+      type: object
+      required:
+        - id
+        - equipment_id
+        - version
+        - package_file_name
+        - file_size_bytes
+        - sha256_hash
+        - chunk_count
+        - encoder_model
+        - vector_dimension
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipment_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+          example: "v1"
+        package_file_name:
+          type: string
+          example: "equipment-knowledge-v1.zip"
+        file_size_bytes:
+          type: integer
+        sha256_hash:
+          type: string
+        chunk_count:
+          type: integer
+        encoder_model:
+          type: string
+          example: "all-MiniLM-L6-v2"
+        vector_dimension:
+          type: integer
+          example: 384
+        created_at:
+          type: string
+          format: date-time
+
+    Device:
+      type: object
+      required:
+        - id
+        - device_identifier
+        - device_name
+        - model
+        - os_version
+        - status
+        - last_heartbeat
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_identifier:
+          type: string
+        device_name:
+          type: string
+        model:
+          type: string
+        os_version:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED]
+        installed_package_versions:
+          type: object
+          additionalProperties:
+            type: string
+        last_heartbeat:
+          type: string
+          format: date-time
+        last_sync:
+          type: string
+          format: date-time
+
+    DeviceRegisterRequest:
+      type: object
+      required:
+        - device_identifier
+        - device_name
+        - model
+        - os_version
+      properties:
+        device_identifier:
+          type: string
+        device_name:
+          type: string
+        model:
+          type: string
+        os_version:
+          type: string
+
+    DeviceRegisterResponse:
+      type: object
+      required:
+        - device_id
+        - token
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        token:
+          type: string
+
+    DeviceHeartbeatRequest:
+      type: object
+      required:
+        - device_id
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        installed_packages:
+          type: object
+          additionalProperties:
+            type: string
+
+    DeviceHeartbeatResponse:
+      type: object
+      required:
+        - acknowledged
+        - server_time
+      properties:
+        acknowledged:
+          type: boolean
+        server_time:
+          type: string
+          format: date-time
+
+    SyncCheckRequest:
+      type: object
+      required:
+        - device_id
+        - installed_packages
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        installed_packages:
+          type: object
+          description: Map of equipment_id (UUID) to installed version string
+          additionalProperties:
+            type: string
+
+    SyncCheckResponse:
+      type: object
+      required:
+        - available_updates
+      properties:
+        available_updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgePackage'
+
+    IncidentSyncPayload:
+      type: object
+      required:
+        - device_id
+        - incidents
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/IncidentSubmission'
+
+    IncidentSubmission:
+      type: object
+      required:
+        - id
+        - equipment_id
+        - title
+        - description
+        - severity
+        - recorded_offline_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipment_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        recorded_offline_at:
+          type: string
+          format: date-time
+        linked_manual_page:
+          type: integer
+        citation_chunk_id:
+          type: string
+
+    IncidentSyncResult:
+      type: object
+      required:
+        - total_received
+        - accepted_count
+        - duplicate_count
+        - rejected_count
+        - synced_ids
+      properties:
+        total_received:
+          type: integer
+        accepted_count:
+          type: integer
+        duplicate_count:
+          type: integer
+        rejected_count:
+          type: integer
+        synced_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    Incident:
+      type: object
+      required:
+        - id
+        - equipment_id
+        - title
+        - description
+        - severity
+        - status
+        - recorded_offline_at
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipment_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        status:
+          type: string
+          enum: [OPEN, IN_REVIEW, RESOLVED, DISMISSED]
+        device_id:
+          type: string
+          format: uuid
+        recorded_offline_at:
+          type: string
+          format: date-time
+        review_notes:
+          type: string
+        reviewer_id:
+          type: string
+          format: uuid
+        reviewed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    IncidentReviewUpdate:
+      type: object
+      required:
+        - status
+        - review_notes
+      properties:
+        status:
+          type: string
+          enum: [OPEN, IN_REVIEW, RESOLVED, DISMISSED]
+        review_notes:
+          type: string
+
+    AiProvider:
+      type: object
+      required:
+        - provider_id
+        - display_name
+        - is_configured
+        - default_model
+        - is_active
+      properties:
+        provider_id:
+          type: string
+          example: "gemini"
+        display_name:
+          type: string
+          example: "Google Gemini"
+        is_configured:
+          type: boolean
+        default_model:
+          type: string
+          example: "gemini-1.5-flash"
+        is_active:
+          type: boolean
+        masked_key:
+          type: string
+          example: "AIza...9xQz"
+
+    AiProviderConfig:
+      type: object
+      required:
+        - provider_id
+        - api_key
+        - model_name
+      properties:
+        provider_id:
+          type: string
+        api_key:
+          type: string
+        model_name:
+          type: string
+        is_active:
+          type: boolean
+
+    AiProviderTestResult:
+      type: object
+      required:
+        - provider_id
+        - success
+        - message
+        - latency_ms
+      properties:
+        provider_id:
+          type: string
+        success:
+          type: boolean
+        message:
+          type: string
+        latency_ms:
+          type: integer
+
+    ChatRequest:
+      type: object
+      required:
+        - question
+        - equipment_id
+      properties:
+        question:
+          type: string
+          example: "What is the emergency shutdown procedure for the main drive motor?"
+        equipment_id:
+          type: string
+          format: uuid
+        ai_mode:
+          type: string
+          enum: [OFFLINE_ONLY, ONLINE_AI, SMART_AUTO]
+          default: SMART_AUTO
+        provider_id:
+          type: string
+          example: "gemini"
+
+    Citation:
+      type: object
+      required:
+        - chunk_id
+        - manual_id
+        - page_number
+        - similarity_score
+        - snippet
+      properties:
+        chunk_id:
+          type: string
+        manual_id:
+          type: string
+          format: uuid
+        manual_title:
+          type: string
+        page_number:
+          type: integer
+        similarity_score:
+          type: number
+          format: float
+        snippet:
+          type: string
+
+    ChatResponse:
+      type: object
+      required:
+        - answer
+        - citations
+        - provider_used
+        - status
+        - execution_trace
+      properties:
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        provider_used:
+          type: string
+          example: "Google Gemini 1.5 Flash via LangGraph"
+        status:
+          type: string
+          enum: [SUCCESS, INSUFFICIENT_EVIDENCE, VERIFICATION_FAILED, ERROR]
+        execution_trace:
+          type: array
+          items:
+            type: string
+          example:
+            - "[PLANNER] Identified equipment S7-1500 PLC"
+            - "[RETRIEVER] Retrieved 4 top manual chunks"
+            - "[EVIDENCE] High relevance score (0.84)"
+            - "[REASONER] Invoked Gemini provider with grounded context"
+            - "[VERIFIER] Verified page citations: [Page 42, Page 43]"
