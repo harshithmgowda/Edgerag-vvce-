@@ -8,7 +8,7 @@ import 'package:crypto/crypto.dart';
 import '../models/models.dart';
 import '../services/network_service.dart';
 
-/// Original page access uses a real admin login; saved pages remain available offline.
+
 class ManualPagePreview extends StatefulWidget {
   final ChunkModel chunk;
   const ManualPagePreview({super.key, required this.chunk});
