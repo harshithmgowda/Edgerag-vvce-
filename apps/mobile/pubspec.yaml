@@ -1,0 +1,68 @@
+name: edgerag_mobile
+description: "EdgeRAG Offline + Online Agentic Industrial Knowledge Platform for Android"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.3+1
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  http: ^1.2.2
+  crypto: ^3.0.5
+  archive: ^3.6.1
+  flutter_secure_storage: ^9.2.2
+  uuid: ^4.5.1
+  shared_preferences: ^2.3.2
+  connectivity_plus: ^6.0.5
+  fllama:
+    path: ../../packages/fllama
+  flutter_markdown: ^0.7.7+1
+  image_picker: ^1.1.2
+  flutter_tts: ^4.2.5
+  speech_to_text: ^7.5.0
+  flutter_edge_ai: ^2.4.1
+  flutter_edge_ai_litertlm: ^1.15.0
+  file_picker: ^10.3.10
+  record: ^7.1.2
+
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  sqflite_common_ffi: ^2.3.6
+  path_provider_platform_interface: ^2.1.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/Roboto-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Variable.ttf
+          weight: 700
+    - family: Metropolis
+      fonts:
+        - asset: assets/fonts/Metropolis-Regular.ttf
+        - asset: assets/fonts/Metropolis-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Metropolis-Bold.ttf
+          weight: 700
+    - family: OpenSans
+      fonts:
+        - asset: assets/fonts/OpenSans-Regular.ttf
+        - asset: assets/fonts/OpenSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/OpenSans-Italic.ttf
+          style: italic
