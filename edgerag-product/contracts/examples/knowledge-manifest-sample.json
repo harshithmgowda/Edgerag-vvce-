@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "package_id": "7f8b898a-1122-4a55-88cc-99aa11bb22cc",
+  "equipment_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "equipment_name": "ABB Industrial Robot IRB 6700",
+  "version": "v1",
+  "generated_at": "2026-10-19T14:00:00Z",
+  "chunk_count": 142,
+  "embedding_spec": {
+    "model_name": "all-MiniLM-L6-v2",
+    "dimension": 384,
+    "normalized": true,
+    "similarity_metric": "cosine"
+  },
+  "manuals": [
+    {
+      "manual_id": "9d8e7f6a-5b4c-3d2e-1f0a-9b8c7d6e5f4a",
+      "title": "ABB IRB 6700 Safety & Maintenance Manual",
+      "revision": "Rev 4.1",
+      "page_count": 68,
+      "chunk_count": 142
+    }
+  ],
+  "sqlite_checksum_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
