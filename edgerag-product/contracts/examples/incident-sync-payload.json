@@ -1,0 +1,16 @@
+{
+  "device_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+  "sync_timestamp": "2026-10-19T14:35:00Z",
+  "incidents": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "equipment_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "title": "Axis 3 Servo Motor High Temperature Alert",
+      "description": "During shift 2 operation, Axis 3 motor temp exceeded 95C under nominal 80% payload. Emergency thermal throttle triggered per manual Section 4.2.",
+      "severity": "HIGH",
+      "recorded_offline_at": "2026-10-19T13:45:10Z",
+      "linked_manual_page": 42,
+      "citation_chunk_id": "chunk_9d8e_42_01"
+    }
+  ]
+}

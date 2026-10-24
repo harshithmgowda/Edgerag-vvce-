@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EdgeRAG Knowledge Package Manifest",
+  "description": "Validation schema for manifest.json bundled inside versioned equipment knowledge ZIP packages.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "package_id",
+    "equipment_id",
+    "equipment_name",
+    "version",
+    "generated_at",
+    "chunk_count",
+    "embedding_spec",
+    "manuals",
+    "sqlite_checksum_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "package_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "equipment_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "equipment_name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "chunk_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "embedding_spec": {
+      "type": "object",
+      "required": [
+        "model_name",
+        "dimension",
+        "normalized",
+        "similarity_metric"
+      ],
+      "properties": {
+        "model_name": {
+          "type": "string",
+          "example": "all-MiniLM-L6-v2"
+        },
+        "dimension": {
+          "type": "integer",
+          "const": 384
+        },
+        "normalized": {
+          "type": "boolean",
+          "const": true
+        },
+        "similarity_metric": {
+          "type": "string",
+          "enum": ["cosine", "dot_product"]
+        }
+      }
+    },
+    "manuals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "manual_id",
+          "title",
+          "revision",
+          "page_count",
+          "chunk_count"
+        ],
+        "properties": {
+          "manual_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "page_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "chunk_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "sqlite_checksum_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
